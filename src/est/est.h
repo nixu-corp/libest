@@ -512,11 +512,7 @@ LIBEST_API int est_convert_p7b64_to_pem(unsigned char *certs_p7, int certs_len, 
     @return void.
  */
 #define est_apps_startup() \
-    do { CRYPTO_malloc_init(); \
-         ERR_load_crypto_strings(); OpenSSL_add_all_algorithms(); \
-         ENGINE_load_builtin_engines(); \
-         SSL_library_init(); \
-         SSL_load_error_strings(); } while (0)
+    do { ; } while (0)
 
 /*! @brief est_apps_shutdown() is used by an application to de-initialize 
     the OpenSSL library.  This should be called to prevent memory
@@ -528,10 +524,7 @@ LIBEST_API int est_convert_p7b64_to_pem(unsigned char *certs_p7, int certs_len, 
     @return void.
  */
 #define est_apps_shutdown() \
-    do { CONF_modules_unload(1); \
-         OBJ_cleanup(); EVP_cleanup(); ENGINE_cleanup(); \
-         CRYPTO_cleanup_all_ex_data(); ERR_remove_thread_state(NULL); \
-         ERR_free_strings(); } while (0)
+    do { ; } while (0)
 
 #ifdef __cplusplus
 }

@@ -263,9 +263,10 @@ X509 *load_cert(BIO *err, const char *file, int format, const char *pass,
         }
     }
 
-    if (format == FORMAT_ASN1)
+    if (format == FORMAT_ASN1) {
         x = d2i_X509_bio(cert, NULL);
-    else if (format == FORMAT_NETSCAPE) {
+#if 0
+    } else if (format == FORMAT_NETSCAPE) {
         NETSCAPE_X509 *nx;
         nx = ASN1_item_d2i_bio(ASN1_ITEM_rptr(NETSCAPE_X509), cert, NULL);
         if (nx == NULL)
@@ -280,6 +281,7 @@ X509 *load_cert(BIO *err, const char *file, int format, const char *pass,
         x = nx->cert;
         nx->cert = NULL;
         NETSCAPE_X509_free(nx);
+#endif
     } else if (format == FORMAT_PEM)
         x = PEM_read_bio_X509_AUX(cert, NULL,
                 (pem_password_cb *) password_callback, NULL);
@@ -1389,12 +1391,12 @@ static int do_sign_init(BIO *err, EVP_MD_CTX *ctx, EVP_PKEY *pkey,
 static int do_X509_sign(BIO *err, X509 *x, EVP_PKEY *pkey, const EVP_MD *md,
 STACK_OF(OPENSSL_STRING) *sigopts) {
     int rv;
-    EVP_MD_CTX mctx;
-    EVP_MD_CTX_init(&mctx);
-    rv = do_sign_init(err, &mctx, pkey, md, sigopts);
+    EVP_MD_CTX *mctx = EVP_MD_CTX_create();
+    EVP_MD_CTX_init(mctx);
+    rv = do_sign_init(err, mctx, pkey, md, sigopts);
     if (rv > 0)
-        rv = X509_sign_ctx(x, &mctx);
-    EVP_MD_CTX_cleanup(&mctx);
+        rv = X509_sign_ctx(x, mctx);
+    EVP_MD_CTX_destroy(mctx);
     return rv > 0 ? 1 : 0;
 }
 
@@ -1410,11 +1412,10 @@ STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy, CA_DB *db,
     ASN1_STRING *str, *str2;
     ASN1_OBJECT *obj;
     X509 *ret = NULL;
-    X509_CINF *ci;
     X509_NAME_ENTRY *ne;
     X509_NAME_ENTRY *tne, *push;
     EVP_PKEY *pktmp;
-    int ok = -1, i, j, last, nid;
+    int ok = -1, i, j, last;
     const char *p;
     CONF_VALUE *cv;
     char *row[DB_NUMBER];
@@ -1439,7 +1440,7 @@ STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy, CA_DB *db,
             goto err;
         }
         X509_REQ_set_subject_name(req, n);
-        req->req_info->enc.modified = 1;
+        // req->req_info->enc.modified = 1;
         X509_NAME_free(n);
     }
 
@@ -1452,6 +1453,7 @@ STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy, CA_DB *db,
         str = X509_NAME_ENTRY_get_data(ne);
         obj = X509_NAME_ENTRY_get_object(ne);
 
+#if 0
         if (msie_hack) {
             /* assume all type should be strings */
             nid = OBJ_obj2nid(ne->object);
@@ -1467,6 +1469,7 @@ STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy, CA_DB *db,
                     && (str->type == V_ASN1_PRINTABLESTRING))
                 str->type = V_ASN1_IA5STRING;
         }
+#endif
 
         /* If no EMAIL is wanted in the subject */
         if ((OBJ_obj2nid(obj) == NID_pkcs9_emailAddress) && (!email_dn))
@@ -1505,7 +1508,7 @@ STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy, CA_DB *db,
     if (selfsign)
         CAname = X509_NAME_dup(name);
     else
-        CAname = X509_NAME_dup(x509->cert_info->subject);
+        CAname = X509_NAME_dup(X509_get_subject_name(x509));
     if (CAname == NULL)
         goto err;
     str = str2 = NULL;
@@ -1708,13 +1711,13 @@ STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy, CA_DB *db,
 
     if ((ret = X509_new()) == NULL)
         goto err;
-    ci = ret->cert_info;
+    // ci = ret->cert_info;
 
     /* Make it an X509 v3 certificate. */
     if (!X509_set_version(ret, 2))
         goto err;
 
-    if (BN_to_ASN1_INTEGER(serial, ci->serialNumber) == NULL)
+    if (BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(ret)) == NULL)
         goto err;
     if (selfsign) {
         if (!X509_set_issuer_name(ret, subject))
@@ -1746,17 +1749,16 @@ STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy, CA_DB *db,
     /* Lets add the extensions, if there are any */
     if (ext_sect) {
         X509V3_CTX ctx;
-        if (ci->version == NULL)
-            if ((ci->version = ASN1_INTEGER_new()) == NULL)
-                goto err;
-        ASN1_INTEGER_set(ci->version, 2); /* version 3 certificate */
+        X509_set_version(ret, 2);  /* version 3 certificate */
 
+#if 0
         /* Free the current entries if any, there should not
          * be any I believe */
         if (ci->extensions != NULL)
             sk_X509_EXTENSION_pop_free(ci->extensions, X509_EXTENSION_free);
 
         ci->extensions = NULL;
+#endif
 
         /* Initialize the context structure */
         if (selfsign)
@@ -2494,9 +2496,11 @@ BIO * ossl_simple_enroll(const char *p10buf, int p10len) {
             if (strcmp(tmp_email_dn, "no") == 0)
                 email_dn = 0;
         }
+#if 0
         if (verbose)
             BIO_printf(bio_err, "message digest is %s\n",
                     OBJ_nid2ln(dgst->type));
+#endif
         if ((policy == NULL)
                 && ((policy = NCONF_get_string(conf, section, ENV_POLICY))
                         == NULL)) {
@@ -2630,12 +2634,12 @@ BIO * ossl_simple_enroll(const char *p10buf, int p10len) {
 
         if (verbose)
             BIO_printf(bio_err, "writing new certificates\n");
+
         for (i = 0; i < sk_X509_num(cert_sk); i++) {
-            int k;
             char *n;
 
             x = sk_X509_value(cert_sk, i);
-
+#if 0
             j = x->cert_info->serialNumber->length;
             p = (const char *) x->cert_info->serialNumber->data;
 
@@ -2643,6 +2647,7 @@ BIO * ossl_simple_enroll(const char *p10buf, int p10len) {
 
             n = (char *) &(buf[2][strlen(buf[2])]);
             if (j > 0) {
+                int k;
                 for (k = 0; k < j; k++) {
                     if (n >= &(buf[2][sizeof(buf[2])]))
                         break;
@@ -2654,6 +2659,9 @@ BIO * ossl_simple_enroll(const char *p10buf, int p10len) {
                 *(n++) = '0';
                 *(n++) = '0';
             }
+#else
+            n = &buf[2][strlen(buf[2])];
+#endif
             *(n++) = '.';
             *(n++) = 'p';
             *(n++) = 'e';

@@ -1,3 +1,4 @@
+/*-*- c-default-style: bsd; tab-width: 8; c-basic-offset: 4; -*- */
 /** @file */
 /*------------------------------------------------------------------
  * est/est_server.c - EST Server specific code
@@ -529,11 +530,8 @@ X509_REQ * est_server_parse_csr (unsigned char *pkcs10, int pkcs10_len)
 int est_tls_uid_auth (EST_CTX *ctx, SSL *ssl, X509_REQ *req) 
 {
     X509_ATTRIBUTE *attr;
-    int i, j;
-
-    ASN1_TYPE *at;
+    int i, atrtype;
     ASN1_BIT_STRING *bs = NULL;
-    ASN1_TYPE *t;
     int rv = EST_ERR_NONE;
     char *tls_uid;
     int diff;
@@ -561,12 +559,14 @@ int est_tls_uid_auth (EST_CTX *ctx, SSL *ssl, X509_REQ *req)
 	 * RFC 7030 requires that we check the PoP when it's present
          */
         attr = X509_REQ_get_attr(req, i);
-
         /*
          * If we found the attribute, get the actual value of the challengePassword
          */
         if (attr) {
-            if (attr->single) {
+            atrtype = ASN1_TYPE_get(X509_ATTRIBUTE_get0_type(attr, 0));
+            bs = X509_ATTRIBUTE_get0_data(attr, 0, atrtype, NULL);
+#if 0
+            if (1 == X509_ATTRIBUTE_count(attro)) {
                 t = attr->value.single;
                 bs = t->value.bit_string;
             } else {
@@ -574,6 +574,7 @@ int est_tls_uid_auth (EST_CTX *ctx, SSL *ssl, X509_REQ *req)
                 at = sk_ASN1_TYPE_value(attr->value.set, j);
                 bs = at->value.asn1_string;
             }
+#endif
         } else {
             EST_LOG_WARN("PoP challengePassword attribute not found in client cert request");
             return (EST_ERR_AUTH_FAIL_TLSUID);
@@ -970,7 +971,7 @@ static EST_ERROR est_server_all_csrattrs_present(EST_CTX *ctx, char *body, int b
         }
 	switch (tag) {
 	case V_ASN1_OBJECT:
-            a_object = c2i_ASN1_OBJECT(NULL, (const unsigned char**)&der_ptr, len);
+            a_object = d2i_ASN1_OBJECT(NULL, (const unsigned char**)&der_ptr, len);
 	    if (!a_object) {
 		EST_LOG_ERR("a_object is null");
 	        est_server_free_csr_oid_list(csr_attr_oids);

@@ -101,6 +101,7 @@ static char valid_token_value[MAX_AUTH_TOKEN_LEN + 1];
  */
 EST_CTX *ectx;
 
+#if 0
 /*
  * We hard-code the DH parameters here.  THIS SHOULD NOT
  * be done in a real application.  The DH parameters need
@@ -153,6 +154,7 @@ static DH *get_dh1024dsa ()
     dh->length = 160;
     return (dh);
 }
+#endif
 
 static char priv_key_pwd[MAX_PWD_LEN];
 static int string_password_cb (char *buf, int size, int wflag, void *data)
@@ -276,7 +278,7 @@ int lookup_pkcs10_request (unsigned char *pkcs10, int p10_len)
      * would do this lookup.  But this should be good enough for
      * testing the retry-after logic.
      */
-    pkey = X509_PUBKEY_get(req->req_info->pubkey);
+    pkey = X509_REQ_get_pubkey(req);
     if (!pkey) {
         rv = 1;
         goto DONE;
@@ -565,11 +567,11 @@ static void extract_sub_name (X509 *cert, char *name, int len)
 
     X509_NAME_print_ex(out, subject_nm, 0, XN_FLAG_SEP_SPLUS_SPC);
     BIO_get_mem_ptr(out, &bm);
-    strncpy(name, bm->data, len);
+    strncpy(name, bm->data, len - 1);
     if (bm->length < len) {
         name[bm->length] = 0;
     } else {
-        name[len] = 0;
+        name[len - 1] = 0;
     }
 
     BIO_free(out);
@@ -839,6 +841,7 @@ int process_http_auth (EST_CTX *ctx, EST_HTTP_AUTH_HDR *ah, X509 *peer_cert,
     return user_valid;
 }
 
+#if 0
 /*
  * This callback is issued during the TLS-SRP handshake.
  * We can use this to get the userid from the TLS-SRP handshake.
@@ -884,6 +887,7 @@ static int process_ssl_srp_auth (SSL *s, int *ad, void *arg)
     fflush(stdout);
     return SSL_ERROR_NONE;
 }
+#endif
 
 /*
  * We're using OpenSSL, both as the CA and libest
@@ -891,6 +895,7 @@ static int process_ssl_srp_auth (SSL *s, int *ad, void *arg)
  * locking callbacks to be set when multi-threaded support
  * is needed.
  */
+#if 0
 static MUTEX_TYPE *mutex_buf = NULL;
 static void locking_function (int mode, int n, const char * file, int line)
 {
@@ -904,6 +909,7 @@ static unsigned long id_function (void)
 {
     return ((unsigned long) THREAD_ID);
 }
+#endif
 
 /*
  * This routine destroys the EST context and frees
@@ -911,8 +917,6 @@ static unsigned long id_function (void)
  */
 void cleanup (void)
 {
-    int i;
-
     est_server_stop(ectx);
     est_destroy(ectx);
 
@@ -923,15 +927,18 @@ void cleanup (void)
     /*
      * Tear down the mutexes used by OpenSSL
      */
+#if 0
     if (!mutex_buf)
         return;
     CRYPTO_set_id_callback(NULL);
     CRYPTO_set_locking_callback(NULL);
+    int i;
     for (i = 0; i < CRYPTO_num_locks(); i++)
         MUTEX_CLEANUP(mutex_buf[i]);
     free(mutex_buf);
     mutex_buf = NULL;
-
+#endif
+    
     BIO_free(bio_err);
     free(cacerts_raw);
     free(trustcerts);
@@ -953,12 +960,11 @@ void cleanup (void)
 int main (int argc, char **argv)
 {
     char c;
-    int i;
 
     X509 *x;
     EVP_PKEY * priv_key;
     BIO *certin;
-    DH *dh;
+    // DH *dh;
     EST_ERROR rv;
     int sleep_delay = 0;
     int retry_period = 300;
@@ -1138,7 +1144,7 @@ int main (int argc, char **argv)
     /*
      * Read in the local server certificate
      */
-    certin = BIO_new(BIO_s_file_internal());
+    certin = BIO_new(BIO_s_file());
     if (BIO_read_filename(certin, certfile) <= 0) {
         printf("\nUnable to read server certificate file %s\n", certfile);
         exit(1);
@@ -1208,6 +1214,8 @@ int main (int argc, char **argv)
         est_server_disable_pop(ectx);
     }
 
+#if 0
+    /* Do not use SRP */
     if (srp) {
         srp_db = SRP_VBASE_new(NULL);
         if (!srp_db) {
@@ -1224,7 +1232,8 @@ int main (int argc, char **argv)
             exit(1);
         }
     }
-
+#endif
+    
     if (est_set_ca_enroll_cb(ectx, &process_pkcs10_enrollment)) {
         printf(
             "\nUnable to set EST pkcs10 enrollment callback.  Aborting!!!\n");
@@ -1317,12 +1326,15 @@ int main (int argc, char **argv)
     /*
      * Set DH parameters for TLS
      */
+#if 0
     dh = get_dh1024dsa();
     if (dh) {
         est_server_set_dh_parms(ectx, dh);
     }
     DH_free(dh);
+#endif
 
+#if 0
     /*
      * Install thread locking mechanism for OpenSSL
      */
@@ -1335,7 +1347,8 @@ int main (int argc, char **argv)
         MUTEX_SETUP(mutex_buf[i]);
     CRYPTO_set_id_callback(id_function);
     CRYPTO_set_locking_callback(locking_function);
-
+#endif
+    
     printf("\nLaunching EST server...\n");
 
     rv = est_server_start(ectx);

@@ -1,3 +1,4 @@
+/*-*- c-default-style: bsd; tab-width: 8; c-basic-offset: 4; -*- */
 /*------------------------------------------------------------------
  * estclient.c - Example application that utilizes libest.a for
  *               EST client operations.  This module utilizes OpenSSL
@@ -254,7 +255,7 @@ EST_HTTP_AUTH_CRED_RC auth_credentials_token_cb (EST_HTTP_AUTH_HDR *auth_credent
                 printf("\nError allocating token string used for credentials\n");
                 return EST_HTTP_AUTH_CRED_NOT_AVAILABLE;
             }
-            strncpy(token_ptr, est_auth_token, strlen(est_auth_token));
+            strncpy(token_ptr, est_auth_token, token_len);
             token_ptr[token_len] = '\0';
         }
         /*
@@ -368,7 +369,10 @@ static int client_manual_cert_verify(X509 *cur_cert, int openssl_cert_error)
      * This fingerprint can be checked against the anticipated value to determine
      * whether or not the server's cert should be approved.
      */
-    X509_signature_print(bio_err, cur_cert->sig_alg, cur_cert->signature);
+    const X509_ALGOR *sig_algor;
+    const ASN1_BIT_STRING *psig;
+    X509_get0_signature(&psig, &sig_algor, cur_cert);
+    X509_signature_print(bio_err, sig_algor, psig);
 
     BIO_free(bio_err);
 
@@ -398,7 +402,7 @@ static X509_REQ *read_csr (char *csr_file)
     /*
      * Read in the csr
      */
-    csrin = BIO_new(BIO_s_file_internal());
+    csrin = BIO_new(BIO_s_file());
     if (BIO_read_filename(csrin, csr_file) <= 0) {
         printf("\nUnable to read CSR file %s\n", csr_file);
         return (NULL);
@@ -935,7 +939,7 @@ static void worker_thread (void *ptr)
     if (verbose) printf("\nEnding thread %d", tctx->thread_id);
     free(tctx);
     ERR_clear_error();
-    ERR_remove_thread_state(NULL);
+    // ERR_remove_thread_state(NULL);
 }
 
 
@@ -946,6 +950,7 @@ static void worker_thread (void *ptr)
  * locking callbacks to be set when multi-threaded support
  * is needed.
  */
+#if 0
 static pthread_mutex_t *ssl_mutexes;
 static void ssl_locking_callback (int mode, int mutex_num, const char *file,
                                   int line)
@@ -964,6 +969,7 @@ static unsigned long ssl_id_callback (void)
     return (unsigned long)pthread_self();
 }
 #endif
+#endif
 
 
 int main (int argc, char **argv)
@@ -973,7 +979,6 @@ int main (int argc, char **argv)
     pthread_attr_t attr;
     pthread_t threads[MAX_THREADS];
     int i;
-    int size;
  #endif
    THREAD_CTX *tctx;
     int set_fips_return = 0;
@@ -1275,7 +1280,7 @@ int main (int argc, char **argv)
      * Read in the current client certificate
      */
     if (client_cert_file[0]) {
-        certin = BIO_new(BIO_s_file_internal());
+        certin = BIO_new(BIO_s_file());
         if (BIO_read_filename(certin, client_cert_file) <= 0) {
             printf("\nUnable to read client certificate file %s\n", client_cert_file);
             exit(1);
@@ -1365,9 +1370,11 @@ int main (int argc, char **argv)
     }
 
 #ifndef DISABLE_PTHREADS
+#if 0
     /*
      * Install thread locking mechanism for OpenSSL
      */
+    int size;
     size = sizeof(pthread_mutex_t) * CRYPTO_num_locks();
     if ((ssl_mutexes = (pthread_mutex_t*)malloc((size_t)size)) == NULL) {
         printf("Cannot allocate mutexes");
@@ -1379,7 +1386,7 @@ int main (int argc, char **argv)
     }
     CRYPTO_set_locking_callback(&ssl_locking_callback);
     CRYPTO_set_id_callback(&ssl_id_callback);
-
+#endif
     /*
      * Start the requested number of threads, each thread
      * will enroll certificate requests
@@ -1408,6 +1415,7 @@ int main (int argc, char **argv)
     /*
      * Tear down the mutexes used by OpenSSL
      */
+#if 0
     CRYPTO_set_locking_callback(NULL);
     for (i = 0; i < CRYPTO_num_locks(); i++) {
         pthread_mutex_destroy(&ssl_mutexes[i]);
@@ -1415,6 +1423,7 @@ int main (int argc, char **argv)
     CRYPTO_set_locking_callback(NULL);
     CRYPTO_set_id_callback(NULL);
     free(ssl_mutexes);
+#endif
 #else
     tctx = malloc(sizeof(THREAD_CTX));
     tctx->thread_id = 0;

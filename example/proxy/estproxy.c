@@ -261,6 +261,7 @@ static EST_HTTP_AUTH_CRED_RC auth_credentials_token_cb (
  * based on the userid and return those parameters by invoking
  * SSL_set_srp_server_param().
  */
+#if 0
 static int process_ssl_srp_auth (SSL *s, int *ad, void *arg)
 {
 
@@ -295,6 +296,7 @@ static int process_ssl_srp_auth (SSL *s, int *ad, void *arg)
     fflush(stdout);
     return SSL_ERROR_NONE;
 }
+#endif
 
 /*
  * We're using OpenSSL, both as the CA and libest
@@ -302,6 +304,7 @@ static int process_ssl_srp_auth (SSL *s, int *ad, void *arg)
  * locking callbacks to be set when multi-threaded support
  * is needed.  
  */
+#if 0
 static MUTEX_TYPE *mutex_buf = NULL;
 static void locking_function (int mode, int n, const char * file, int line)
 {
@@ -315,14 +318,16 @@ static unsigned long id_function (void)
 {
     return ((unsigned long) THREAD_ID);
 }
+#endif
 
 void cleanup (void)
 {
-    int i;
-
+#if 0
     /*
      * Tear down the mutexes used by OpenSSL
      */
+    int i;
+
     if (!mutex_buf)
         return;
     CRYPTO_set_id_callback(NULL);
@@ -331,7 +336,7 @@ void cleanup (void)
         MUTEX_CLEANUP(mutex_buf[i]);
     free(mutex_buf);
     mutex_buf = NULL;
-
+#endif
     est_proxy_stop(ectx);
     est_destroy(ectx);
     if (srp_db) {
@@ -494,7 +499,7 @@ int main (int argc, char **argv)
     /*
      * Read in the local server certificate 
      */
-    certin = BIO_new(BIO_s_file_internal());
+    certin = BIO_new(BIO_s_file());
     if (BIO_read_filename(certin, certfile) <= 0) {
         printf("\nUnable to read server certificate file %s\n", certfile);
         exit(1);
@@ -514,7 +519,7 @@ int main (int argc, char **argv)
     /* 
      * Read in the server's private key
      */
-    keyin = BIO_new(BIO_s_file_internal());
+    keyin = BIO_new(BIO_s_file());
     if (BIO_read_filename(keyin, keyfile) <= 0) {
         printf("\nUnable to read server private key file %s\n", keyfile);
         exit(1);
@@ -594,11 +599,12 @@ int main (int argc, char **argv)
             printf("\nUnable initialize SRP verifier database.  Aborting!!!\n");
             exit(1);
         }
-
+#if 0
         if (est_server_enable_srp(ectx, &process_ssl_srp_auth)) {
             printf("\nUnable to enable SRP.  Aborting!!!\n");
             exit(1);
         }
+#endif
     }
 
     if (client_token_auth_mode) {
@@ -609,6 +615,7 @@ int main (int argc, char **argv)
         }
     }
 
+#if 0
     /*
      * Install thread locking mechanism for OpenSSL
      */
@@ -621,7 +628,7 @@ int main (int argc, char **argv)
         MUTEX_SETUP(mutex_buf[i]);
     CRYPTO_set_id_callback(id_function);
     CRYPTO_set_locking_callback(locking_function);
-
+#endif
     printf("\nLaunching EST proxy...\n");
 
     rv = est_proxy_start(ectx);

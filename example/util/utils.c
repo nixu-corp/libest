@@ -266,7 +266,7 @@ EVP_PKEY *read_private_key(const char *key_file, pem_password_cb *cb)
     /*
      * Read in the private key
      */
-    keyin = BIO_new(BIO_s_file_internal());
+    keyin = BIO_new(BIO_s_file());
     if (BIO_read_filename(keyin, key_file) <= 0) {
     EST_LOG_ERR("Unable to read private key file %s", key_file);
     return(NULL);
