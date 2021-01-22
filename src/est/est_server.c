@@ -961,6 +961,7 @@ est_server_set_enhcd_cert_auth_local_pki_nid (EST_CTX *ctx,
  */
 static int est_check_cmcRA (X509 *cert) 
 {
+    return 1;
     int cmcRA_found = 0;
     EXTENDED_KEY_USAGE *extusage;
     int i;

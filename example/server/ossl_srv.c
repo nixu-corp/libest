@@ -2160,7 +2160,7 @@ BIO * ossl_simple_enroll(const char *p10buf, int p10len) {
     char passargin[20] = "pass:hello";
     ENGINE *e = NULL;
     char *key = NULL;
-    int create_ser = 0;
+    int create_ser = 1;
     int free_key = 0;
     int total = 0;
     int total_done = 0;
